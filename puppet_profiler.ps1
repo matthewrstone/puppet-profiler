@@ -1,17 +1,24 @@
 ﻿Param(
   [string]$DataFormat,
   [string]$WorkDirectory,
-  [string]$FeatureKey
+  [string]$FeatureKey,
+  [switch]$GetPackages
 )
 
 Write-Host "---WINDOWS PUPPET PROFILER---"
 # Setting variables
-[array]$features = (Get-WindowsFeature | Where { $_.Installed -match 'True' }).Name
+[array]$features = ($getCmd | Where { $_.Installed -match 'True' }).Name
+
+# Check 2008 or 2012
+If (([environment]::OSVersion.Version.Minor) -eq 1) {
+  $getCmd = "Import-Module ServerManager; Get-WindowsFeature"
+} else {
+  $getCmd = "Get-WindowsFeature"
+}
 
 # Conditional Logic for WorkDirectory
 # Defaults to c:\TEMP
 If (!($WorkDirectory)) { $WorkDirectory = 'C:\TEMP' }
-
 
 
 # Function to validate and create the work directory
@@ -37,7 +44,7 @@ Function toYAML() {
   foreach ($feature in $features) {
     $featureArray += "  - " + $feature
     }
-  Write-Host "Writing file to $WorkDirectoryls\$FeatureKey.yaml"
+  Write-Host "Writing feature data to $WorkDirectory\$FeatureKey.yaml"
   $featureArray | Out-File "$FeatureKey.yaml"
 }    
 
@@ -50,7 +57,7 @@ Function toJSON(){
   $featureHash.$FeatureKey = $features
      
   ConvertTo-Json $featureHash | Out-File "$FeatureKey.json"
-  Write-Host "Writing Windows Features to $FeatureKey.json"
+  Write-Host "Writing feature data to $FeatureKey.json"
 }
 
 Function toPuppet(){
@@ -67,11 +74,29 @@ Function toPuppet(){
   }
   $puppetArray += "],"
   $puppetArray | Out-File "$FeatureKey.pp"
-  Write-Host "Writing puppet manifest sample data to $FeatureKey.pp"
+  Write-Host "Writing feature data to sample puppet manifest $FeatureKey.pp"
+}
+
+# Gets packages and creates a sample manifest.
+Function getPackages() {
+  [array]$packages = (Get-WmiObject -Class Win32_Product).Name
+  $pkg_array = @()
+  foreach ( $package in $packages ) {
+    $pkg_array += "package { '$package':"
+    $pkg_array += "  ensure => present,"
+    $pkg_array += "  source => `"\\path\to\msi`","
+    $pkg_array += "  install_options => [ `"/qn`" ],"
+    $pkg_array += "}"
+  }
+  $pkg_array | Out-File "packages.pp"
+  Write-Host "Writing package sample manifest to packages.pp"
 }
 
 # Create and change to the work directory.
 setWorkDirectory($WorkDirectory)
+
+# Optional GetPackages
+If ($GetPackages) { getPackages }
 
 Write-Host "Determining Windows Features..."
 
@@ -88,15 +113,3 @@ else {
   break
 }
 
-# Packages. Needs a rewrite.
-#[array]$packages = (Get-WmiObject -Class Win32_Product).Name
-#$pkg_array = @()
-#foreach ( $package in $packages ) {
-#  $pkg_array += "package { '$package':"
-#  $pkg_array += "  ensure => present,"
-#  $pkg_array += "  source => `"\\path\to\msi`","
-#  $pkg_array += "  install_options => [ `"/qn`" ],"
-#  $pkg_array += "}"
-#}
-#$pkg_array | Out-File "puppet_package_manifest.txt"
-#Write-Host "Packages written to puppet_package_manifest.txt"
