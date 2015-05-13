@@ -42,18 +42,33 @@ Function toYAML() {
 }    
 
 #Function for dataformat as JSON
-#Function toJSON(){
-#  If (!($FeatureKey)) { 
-#    [string]$FeatureKey = "windows_features"
-#  }
-#  $featureHash = @{}
-#  $featureArray = $featureHash[@()]
-#  $featureArray += "$FeatureKey`:"
-#  foreach ($feature in $features) {
-#    $featureArray += $feature
-#    }
-#  ConvertTo-Json $featureArray
-#}
+Function toJSON(){
+  If (!($FeatureKey)) { 
+    [string]$FeatureKey = "windows_features"
+  }
+  $featureHash = @{}
+  $featureHash.$FeatureKey = $features
+     
+  ConvertTo-Json $featureHash | Out-File "$FeatureKey.json"
+  Write-Host "Writing Windows Features to $FeatureKey.json"
+}
+
+Function toPuppet(){
+
+# Conditional Logic for FeatureKey
+# Defaults to windows_features
+  If (!($FeatureKey)) { 
+    [string]$FeatureKey = "windows_features"
+  }
+  $puppetArray = @()
+  $puppetArray += "`$$FeatureKey = ["
+  foreach ($feature in $features) {
+    $puppetArray += "  `"$feature`","
+  }
+  $puppetArray += "],"
+  $puppetArray | Out-File "$FeatureKey.pp"
+  Write-Host "Writing puppet manifest sample data to $FeatureKey.pp"
+}
 
 # Create and change to the work directory.
 setWorkDirectory($WorkDirectory)
